@@ -9,7 +9,14 @@ struct QueueOptions {
     std::optional<int> capacity;
 };
 
+///
+///
+///
+
 class IQueue {
+public:
+    using Task = std::function<void()>;
+
 public:
     virtual ~IQueue() = default;
     virtual void push(std::function<void()> task) = 0;

@@ -10,23 +10,57 @@
 #include <mutex>
 #include <optional>
 #include <stdexcept>
-#include <unordered_map>
+#include <ranges>
+#include <algorithm>
 
 namespace dispatcher::queue {
 
-class PriorityQueue {
-    // здесь ваш код
-public:
-    // explicit PriorityQueue(?);
+namespace details {
 
-    void push(TaskPriority priority, std::function<void()> task);
+std::unique_ptr<IQueue> createUnboundQueue() noexcept;
+
+std::unique_ptr<IQueue> createBoundQueue(int capacity) noexcept;
+
+} // namespace details
+
+///
+///
+///
+
+class PriorityQueue {
+public:
+    using Task = std::function<void()>;
+
+public:
+    explicit PriorityQueue(const std::map<TaskPriority, QueueOptions> &qConfiguration):
+        qs {} 
+    {
+        std::ranges::for_each(qConfiguration, [&](const auto &pair){
+            auto [priority, config] = pair;
+            if (config.bounded) {
+                qs.emplace(priority, details::createBoundQueue(config.capacity.value_or(1000)));
+            }
+            else
+            {
+                qs.emplace(priority, details::createUnboundQueue());
+            }
+        });
+    }
+
+    void push(TaskPriority priority, Task task);
+
     // block on pop until shutdown is called
     // after that return std::nullopt on empty queue
-    std::optional<std::function<void()>> pop();
+    std::optional<Task> pop();
 
     void shutdown();
 
-    ~PriorityQueue();
+private:
+    std::map<TaskPriority, std::unique_ptr<IQueue>> qs;
+    std::atomic<int> taskNumber = 0;
+    std::condition_variable rx;
+    std::mutex m;
+    bool isActive = true;
 };
 
 }  // namespace dispatcher::queue
